@@ -9,12 +9,12 @@
 namespace tensorflow{
 
 namespace functor{
-// using GPUDevice = Eigen::GpuDevice;
+using GPUDevice = Eigen::GpuDevice;
 
 template<typename T>
 void AffineSmoothOpFunctor<T>::operator()(const GPUDevice& d, const int64 number_of_elements, 
-	const T* output, const T* input, float epsilon, 
-	int patch, int h, int w, int f_r, int f_e, T* output_affine)
+	const T* output, const T* input, const float* epsilon, 
+	const int* patch, const int* h, const int* w, const float* f_r, const float* f_e, T* output_affine)
 {
 	const GpuLaunchConfig config =
 	  GetGpuLaunchConfig(number_of_elements, d);

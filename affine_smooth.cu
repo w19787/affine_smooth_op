@@ -6,6 +6,11 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#define EIGEN_USE_GPU
+#include "tensorflow/core/util/gpu_kernel_helper.h"
+
+namespace tensorflow{
+
 #define TB 256
 #define EPS 1e-7
 
@@ -147,7 +152,7 @@ __device__ bool InverseMat4x4(double m_in[4][4], double inv_out[4][4]) {
     return true;
 }
 
-__device__ void best_local_affine_kernel(
+__global__ void best_local_affine_kernel(
 	const float *output, const float *input, float *affine_model,
 	int h, int w, float epsilon, int kernel_radius
 )
@@ -241,7 +246,7 @@ __device__ void best_local_affine_kernel(
 	return ;
 }
 
-__device__ void bilateral_smooth_kernel(
+__global__ void bilateral_smooth_kernel(
 	float *affine_model, float *filtered_affine_model, const float *guide,
 	int h, int w, int kernel_radius, float sigma1, float sigma2
 )
@@ -290,7 +295,7 @@ __device__ void bilateral_smooth_kernel(
 	return ;
 }
 
-__device__ void reconstruction_best_kernel(
+__global__ void reconstruction_best_kernel(
 	const float *input, float *filtered_affine_model, float *filtered_best_output,
 	int h, int w
 )
@@ -321,8 +326,29 @@ __device__ void reconstruction_best_kernel(
 	return ;
 }
 
-__global__ void apply_affine_smooth(const float* output, const float* input, float epsilon, int patch, int h, int w, int f_r, int f_e, float* smooth_output)
+// __global__ void apply_affine_smooth(const float* output, const float* input, 
+// 	float epsilon, int patch, int h, int w, float f_r, float f_e, float* smooth_output)
+// {
+
+// 	// cudaMallocManaged(affine_model, h*w*12*sizeof(float));
+// 	// cudaMallocManaged(filtered_affine_model, h*w*12*sizeof(float));
+// 	best_local_affine_kernel(output, input, affine_model, h, w, epsilon, radius);
+// 	bilateral_smooth_kernel(affine_model, filtered_affine_model, input, h, w, radius, sigma1, sigma2);
+// 	reconstruction_best_kernel(input, filtered_affine_model, smooth_output, h, w);
+
+// }
+
+
+void AffineSmoothKernalLauncher(const float* output, const float* input, const float* p_epsilon, const int* p_patch, 
+	const int* ph, const int* pw, const float* pf_r, const float* pf_e, float* output_affine, int block_count, int threads_per_block, cudaStream_t stream)
 {
+	float epsilon = ldg(p_epsilon);
+	int patch = ldg(p_patch);
+	int h = ldg(ph);
+	int w = ldg(pw);
+	int f_r = ldg(pf_r);
+	int f_e = ldg(pf_e);
+
 	float sigma1 = f_r/3;
 	float sigma2 = f_e;
 
@@ -333,16 +359,13 @@ __global__ void apply_affine_smooth(const float* output, const float* input, flo
 
 	affine_model = (float *)malloc(h*w*12*sizeof(float));
 	filtered_affine_model = (float *)malloc(h*w*12*sizeof(float));
-	// cudaMallocManaged(affine_model, h*w*12*sizeof(float));
-	// cudaMallocManaged(filtered_affine_model, h*w*12*sizeof(float));
 
-	best_local_affine_kernel(output, input, affine_model, h, w, epsilon, radius);
-	bilateral_smooth_kernel(affine_model, filtered_affine_model, input, h, w, radius, sigma1, sigma2);
-	reconstruction_best_kernel(input, filtered_affine_model, smooth_output, h, w);
+	best_local_affine_kernel<<<block_count, threads_per_block, 0, stream>>>(output, input, affine_model, h, w, epsilon, radius);
+	bilateral_smooth_kernel<<<block_count, threads_per_block, 0, stream>>>(affine_model, filtered_affine_model, input, h, w, radius, sigma1, sigma2);
+	reconstruction_best_kernel<<<block_count, threads_per_block, 0, stream>>>(input, filtered_affine_model, output_affine, h, w);
+
+	free(affine_model);
+	free(filtered_affine_model);
 }
 
-void AffineSmoothKernalLauncher(const float* output, const float* input, float epsilon, int patch, 
-	int h, int w, int f_r, int f_e, float* output_affine, int block_count, int threads_per_block, cudaStream_t stream){
-
-	apply_affine_smooth<<<block_count, threads_per_block, 0, stream>>>(output, input, epsilon, patch, h, w, f_r, f_e, output_affine);
 }

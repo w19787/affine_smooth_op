@@ -5,7 +5,10 @@
 #include "tensorflow/core/framework/op.h"
 // #include "tensorflow/core/util/cuda_kernel_helper.h"
 
-void AffineSmoothKernalLauncher(const float* output, const float* input, float epsilon, int patch, 
-	int h, int w, int f_r, int f_e, float* output_affine, int block_count, int threads_per_block, cudaStream_t stream);
+namespace tensorflow {
 
+void AffineSmoothKernalLauncher(const float* output, const float* input, const float* epsilon, const int* patch, 
+	const int* h, const int* w, const float* f_r, const float* f_e, float* output_affine, int block_count, int threads_per_block, cudaStream_t stream);
+
+}
 #endif

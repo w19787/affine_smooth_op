@@ -1,22 +1,28 @@
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/op.h"
+#include "tensorflow/core/framework/shape_inference.h"
 #include "affine_smooth_op.h"
 
 using namespace tensorflow;
 
 REGISTER_OP("AffineSmooth")
-  .Attr("T: type")
-  .Input("output: T")
-  .Input("input: T")
+  .Input("input1: T")
+  .Input("input2: T")
   .Input("epsilon: float32")
   .Input("patch: int32")
   .Input("h: int32")
   .Input("w: int32")
-  .Input("f_r: int32")
-  .Input("f_e: int32")
-  .Output("smooth_output: T");
+  .Input("f_r: float32")
+  .Input("f_e: float32")
+  .Output("smooth_output: T")
+  .Attr("T: numbertype")
+  .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
+  c->set_output(0, c->input(0));
+  return Status::OK();
+});
 
 using GPUDevice = Eigen::GpuDevice;
+// using CPUDevice = Eigen::ThreadPoolDevice;
 
 template <typename Device, typename T>
 class AffineSmoothOp : public OpKernel {
@@ -25,6 +31,7 @@ class AffineSmoothOp : public OpKernel {
 
     void Compute(OpKernelContext* context) override {
       // Grab the input tensor
+
       const Tensor& output_tensor = context->input(0);
       const Tensor& input_tensor = context->input(1);
       const Tensor& epsilon_tensor = context->input(2);
@@ -34,18 +41,16 @@ class AffineSmoothOp : public OpKernel {
       const Tensor& fr_tensor = context->input(6);
       const Tensor& fe_tensor = context->input(7);
 
-      const auto data_ptr = [](const Tensor& tensor) -> const T* {
-        return reinterpret_cast<const T*>(tensor.tensor_data().data());
-      };
-
+ 
       auto output = output_tensor.flat<T>().data();
       auto input = input_tensor.flat<T>().data();
-      auto epsilon = *data_ptr(epsilon_tensor);
-      auto patch = *data_ptr(patch_tensor);
-      auto h = *data_ptr(height_tensor);
-      auto w = *data_ptr(width_tensor);
-      auto f_r = *data_ptr(fr_tensor);
-      auto f_e = *data_ptr(fe_tensor);
+      auto epsilon = epsilon_tensor.flat<float>().data();
+      auto patch = patch_tensor.flat<int>().data();
+      auto h = height_tensor.flat<int>().data();
+      auto w = width_tensor.flat<int>().data();
+      auto f_r = fr_tensor.flat<float>().data();
+      auto f_e = fe_tensor.flat<float>().data();
+
 
       const int64 number_of_elements = input_tensor.NumElements();
 
@@ -63,8 +68,7 @@ class AffineSmoothOp : public OpKernel {
     functor::AffineSmoothOpFunctor<T> functor_;
 };
 
-// Register the GPU kernels.
-#ifdef GOOGLE_CUDA
+
 #define REGISTER_GPU(T) \
   REGISTER_KERNEL_BUILDER( \
       Name("AffineSmooth")      \
@@ -73,4 +77,14 @@ class AffineSmoothOp : public OpKernel {
     AffineSmoothOp<GPUDevice, T>);
 REGISTER_GPU(float);
 
-#endif // GOOGLE_CUDA
+// Register the GPU kernels.
+// #ifdef GOOGLE_CUDA
+// #define REGISTER_GPU(T) \
+//   REGISTER_KERNEL_BUILDER( \
+//       Name("AffineSmooth")      \
+//       .Device(DEVICE_GPU)   \
+//       .TypeConstraint<T>("T"),  \
+//     AffineSmoothOp<GPUDevice, T>);
+// REGISTER_GPU(float);
+
+// #endif // GOOGLE_CUDA
