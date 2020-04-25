@@ -15,8 +15,8 @@ GPUDEF    = -D GOOGLE_CUDA=1
 CGPUFLAGS = -lcudart -ltensorflow_framework
 
 
-SRC       = affine_smooth_op_cu.cc affine_smooth_op.cc
-GPUSRC    = affine_smooth.cu
+SRC       = affine_smooth_op.cc
+GPUSRC    = affine_smooth_op_cu.cc
 PROD      = affine_smooth.so
 GPUPROD = affine_smooth_cu.so
 
