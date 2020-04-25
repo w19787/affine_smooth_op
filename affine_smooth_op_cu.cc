@@ -16,9 +16,10 @@ void AffineSmoothOpFunctor<T>::operator()(const GPUDevice& d, const int64 number
 	const T* output, const T* input, const float* epsilon, 
 	const int* patch, const int* h, const int* w, const float* f_r, const float* f_e, T* output_affine)
 {
-	const GpuLaunchConfig config =
-	  GetGpuLaunchConfig(number_of_elements, d);
-	const int threads_per_block = config.thread_per_block;
+	// const GpuLaunchConfig config =
+	//   GetGpuLaunchConfig(number_of_elements, d);
+	// const int threads_per_block = config.thread_per_block;
+	const int threads_per_block = 256;
 	const int block_count =
 	  (number_of_elements + threads_per_block - 1) / threads_per_block;
 

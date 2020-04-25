@@ -325,29 +325,36 @@ __global__ void reconstruction_best_kernel(
 	}
 	return ;
 }
+void print_buff(int h, int w, float* buff){
+	float* host_output = (float *)malloc(h*w*3*sizeof(float));
 
-// __global__ void apply_affine_smooth(const float* output, const float* input, 
-// 	float epsilon, int patch, int h, int w, float f_r, float f_e, float* smooth_output)
-// {
+	cudaMemcpy(host_output, buff, h*w*3*sizeof(float), cudaMemcpyDeviceToHost);
+	for(int i=100000; i<100200; i++){
+		printf("%f, %f, %f\n", host_output[i*3], host_output[i*3 + 1], host_output[i*3 + 2]);
+	}
 
-// 	// cudaMallocManaged(affine_model, h*w*12*sizeof(float));
-// 	// cudaMallocManaged(filtered_affine_model, h*w*12*sizeof(float));
-// 	best_local_affine_kernel(output, input, affine_model, h, w, epsilon, radius);
-// 	bilateral_smooth_kernel(affine_model, filtered_affine_model, input, h, w, radius, sigma1, sigma2);
-// 	reconstruction_best_kernel(input, filtered_affine_model, smooth_output, h, w);
-
-// }
+	free(host_output);	
+}
 
 
 void AffineSmoothKernalLauncher(const float* output, const float* input, const float* p_epsilon, const int* p_patch, 
 	const int* ph, const int* pw, const float* pf_r, const float* pf_e, float* output_affine, int block_count, int threads_per_block, cudaStream_t stream)
 {
-	float epsilon = ldg(p_epsilon);
-	int patch = ldg(p_patch);
-	int h = ldg(ph);
-	int w = ldg(pw);
-	int f_r = ldg(pf_r);
-	int f_e = ldg(pf_e);
+	float epsilon;
+	int patch;
+	int h;
+	int w;
+	float f_r;
+	float f_e;
+	cudaMemcpy(&epsilon, p_epsilon, sizeof(float), cudaMemcpyDeviceToHost);
+	cudaMemcpy(&patch, p_patch, sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(&h, ph, sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(&w, pw, sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(&f_r, pf_r, sizeof(float), cudaMemcpyDeviceToHost);
+	cudaMemcpy(&f_e, pf_e, sizeof(float), cudaMemcpyDeviceToHost);
+
+	printf("** ep: %f, p: %d, h: %d, w:%d, fr: %f, fe: %f\n", epsilon, patch, h, w, f_r, f_e);
+	printf("** block_count: %d, threads_per_block: %d\n", block_count, threads_per_block);
 
 	float sigma1 = f_r/3;
 	float sigma2 = f_e;
@@ -356,16 +363,20 @@ void AffineSmoothKernalLauncher(const float* output, const float* input, const f
 	float* filtered_affine_model;
 
 	int radius = (patch - 1) / 2;
+	printf("**sigma1: %f, sigma2: %f, radius: %d**\n", sigma1, sigma2, radius);
 
-	affine_model = (float *)malloc(h*w*12*sizeof(float));
-	filtered_affine_model = (float *)malloc(h*w*12*sizeof(float));
+	cudaMalloc(&affine_model, h*w*12*sizeof(float));
+	cudaMalloc(&filtered_affine_model, h*w*12*sizeof(float));
 
-	best_local_affine_kernel<<<block_count, threads_per_block, 0, stream>>>(output, input, affine_model, h, w, epsilon, radius);
-	bilateral_smooth_kernel<<<block_count, threads_per_block, 0, stream>>>(affine_model, filtered_affine_model, input, h, w, radius, sigma1, sigma2);
-	reconstruction_best_kernel<<<block_count, threads_per_block, 0, stream>>>(input, filtered_affine_model, output_affine, h, w);
+	dim3 dimBlock(256, 1);
+	dim3 dimGrid(int((h * w) / 256 + 1), 1);
 
-	free(affine_model);
-	free(filtered_affine_model);
+	best_local_affine_kernel<<<dimGrid, dimBlock, 0, stream>>>(output, input, affine_model, h, w, epsilon, radius);
+	bilateral_smooth_kernel<<<dimGrid, dimBlock, 0, stream>>>(affine_model, filtered_affine_model, input, h, w, int(f_r), sigma1, sigma2);
+	reconstruction_best_kernel<<<dimGrid, dimBlock, 0, stream>>>(input, filtered_affine_model, output_affine, h, w);
+
+	cudaFree(affine_model);
+	cudaFree(filtered_affine_model);
 }
 
 }

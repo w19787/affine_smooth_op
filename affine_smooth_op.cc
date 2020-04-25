@@ -14,12 +14,12 @@ REGISTER_OP("AffineSmooth")
   .Input("w: int32")
   .Input("f_r: float32")
   .Input("f_e: float32")
-  .Output("smooth_output: T")
+  .Output("output: T")
   .Attr("T: numbertype")
   .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
-  c->set_output(0, c->input(0));
-  return Status::OK();
-});
+    c->set_output(0, c->input(0));
+    return Status::OK();
+  });
 
 using GPUDevice = Eigen::GpuDevice;
 // using CPUDevice = Eigen::ThreadPoolDevice;
