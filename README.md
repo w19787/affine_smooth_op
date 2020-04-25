@@ -29,9 +29,9 @@ ln -sf /usr/local/cuda-10.1/targets/x86_64-linux/ cuda
 
 # Affine Result
 <p align="center">
-    <img src='examples/gen101.png' height='140' width='210'/>
-    <img src='examples/in101.png' height='140' width='210'/>
-    <img src='examples/affine_smooth101.png' height='140' width='210'/>
+    <img src='examples/gen101.png' height='401' width='363'/>
+    <img src='examples/in101.png' height='401' width='363'/>
+    <img src='examples/affine_smooth101.png' height='401' width='363'/>
 </p>
 
 
